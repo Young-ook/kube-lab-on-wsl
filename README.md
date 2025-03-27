@@ -46,6 +46,44 @@ kubectl get nodes
 ```
 You should see at least one node listed, confirming your cluster is up and running.
 
+## asdf
+*asdf*, a multi-runtime version manager is a centralized tool that allows users to easily install and switch between different versions of development tools. The old way of working required multiple CLI (Command Line Interface) version managers, each with their distinct API, configuration files and implementations (e.g., $PATH manipulation, shims, environment variable, etc ...). However, *asdf* is providing 1/ a **single interface** and configuration file to simplify development
+workflow, and can be extended to all tools and runtimes via a simple plugin interface. And it supports 2/ version definitions with one file (.tool-version), you can share with your team ensuring everyone is using the **exact same* version of tools.
+
+### Install asdf
+In this example, we will install pre-compiled *asdf* binary.
+
+1. Visit [https://github.com/asdf-vm/asdf/releases](https://github.com/asdf-vm/asdf/releases) and download the appropriate archive for your operating system/architecture combination. This is an example to download package for Linux (x86 64-bit architecture).
+```bash
+curl -LO https://github.com/asdf-vm/asdf/releases/download/v0.16.6/asdf-v0.16.6-linux-amd64.tar.gz
+```
+2. Extract the *asdf* binary in the archive into a directory on your `$PATH` (*$HOME/.local/bin* or */usr/local/bin*).
+3. Verify *asdf* is on your shell's `$PATH` by running `type -a asdf`. The directory you placed the asdf binary in should be listed on the first line of the output from type.
+
+For more details, please refer to [the getting started guide](https://asdf-vm.com/guide/getting-started.html).
+
+### Configure asdf
+Add the following to `~/.bash_profile` (bash) or `~/.zshrc` (zsh).
+```bash
+export PATH="${ASDF_DATA_DIR:-$HOME/.asdf}/shims:$PATH"
+```
+
+### Install kubectl
+*kubectl* is a command line tool for communicating with a Kubernetes cluster's control plane, using the Kubernetes API.Install *kubectl* version 1.32.1 and set as current version.
+```bash
+asdf plugin add kubectl
+asdf install kubectl 1.32.1
+asdf set kubectl 1.32.1
+kubectl version --client
+```
+
+To install the latest version, run `asdf install kubectl latest` instead of a specific version.
+This will list all installed versions and allow you to switch to the desired version as follows.
+```bash
+asdf list
+asdf set kubectl 1.32.1
+```
+
 # Clean up
 
 # Additional Resources
