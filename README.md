@@ -77,8 +77,7 @@ asdf set kubectl 1.32.1
 asdf list                 # or kubectl version --client
 ```
 
-To install the latest version, run `asdf install kubectl latest` instead of a specific version.
-This will list all installed versions and allow you to switch to the desired version as follows.
+To install the latest version, run `asdf install kubectl latest` instead of a specific version. And then, you can list all installed versions and switch to version what you want.
 ```bash
 asdf list
 asdf set kubectl 1.32.1
