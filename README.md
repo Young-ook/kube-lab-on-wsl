@@ -48,7 +48,7 @@ You should see at least one node listed, confirming your cluster is up and runni
 
 ## asdf
 *asdf*, a multi-runtime version manager is a centralized tool that allows users to easily install and switch between different versions of development tools. The old way of working required multiple CLI (Command Line Interface) version managers, each with their distinct API, configuration files and implementations (e.g., $PATH manipulation, shims, environment variable, etc ...). However, *asdf* is providing 1/ a **single interface** and configuration file to simplify development
-workflow, and can be extended to all tools and runtimes via a simple plugin interface. And it supports 2/ version definitions with one file (.tool-version), you can share with your team ensuring everyone is using the **exact same* version of tools.
+workflow, and can be extended to all tools and runtimes via a simple plugin interface. And it supports 2/ version definitions with one file (.tool-version), you can share with your team ensuring everyone is using the **exact same** version of tools.
 
 ### Install asdf
 In this example, we will install pre-compiled *asdf* binary.
