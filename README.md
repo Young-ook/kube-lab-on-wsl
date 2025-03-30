@@ -69,12 +69,12 @@ export PATH="${ASDF_DATA_DIR:-$HOME/.asdf}/shims:$PATH"
 ```
 
 ### Install kubectl
-*kubectl* is a command line tool for communicating with a Kubernetes cluster's control plane, using the Kubernetes API.Install *kubectl* version 1.32.1 and set as current version.
+*kubectl* is a command line tool for communicating with a Kubernetes cluster's control plane, using the Kubernetes API.Install *kubectl* and set current version.
 ```bash
 asdf plugin add kubectl
 asdf install kubectl 1.32.1
 asdf set kubectl 1.32.1
-kubectl version --client
+asdf list                 # or kubectl version --client
 ```
 
 To install the latest version, run `asdf install kubectl latest` instead of a specific version.
@@ -82,6 +82,16 @@ This will list all installed versions and allow you to switch to the desired ver
 ```bash
 asdf list
 asdf set kubectl 1.32.1
+```
+
+### Install helm
+Helm is a package manager for Kubernetes. It uses 'charts' as its package format, which is based on YAML. Helm provides a command line tool to manage helm charts. Install *helm*.
+
+```bash
+asdf plugin add helm
+asdf install helm 3.17.1
+asdf set helm 3.17.1
+asdf list                 # or helm version
 ```
 
 # Clean up
