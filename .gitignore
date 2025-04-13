@@ -1,0 +1,5 @@
+# asdf configuration files
+.tool-versions
+
+# Minio data for Grafana stack
+**/.data/
