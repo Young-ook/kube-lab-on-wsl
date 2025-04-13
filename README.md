@@ -93,6 +93,9 @@ asdf set helm 3.17.1
 asdf list                 # or helm version
 ```
 
+# Labs
+- [Observability Lab](labs/observability-lab.md)
+
 # Clean up
 
 # Additional Resources
