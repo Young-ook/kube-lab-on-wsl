@@ -1,0 +1,283 @@
+---
+networks:
+  grafana-net:
+    driver: bridge
+
+services:
+  flog:
+    image: mingrammer/flog
+    command: -f json -d 200ms -l
+    networks:
+      - grafana-net
+
+  alloy:
+    image: grafana/alloy:latest
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    ports:
+      - 12345
+    volumes:
+      - ./config/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - gateway
+    networks:
+      - grafana-net
+
+  loki-read:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki/config.yaml", "-target=read"]
+    ports:
+      - 3100
+      - 7946
+      - 9095
+    volumes:
+      - ./config/loki-config.yaml:/etc/loki/config.yaml
+    depends_on:
+      - minio
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  loki-write:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki/config.yaml", "-target=write"]
+    ports:
+      - 3100
+      - 7946
+      - 9095
+    volumes:
+      - ./config/loki-config.yaml:/etc/loki/config.yaml
+    depends_on:
+      - minio
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  loki-backend:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki/config.yaml", "-target=backend", "-legacy-read-mode=false"]
+    ports:
+      - 3100
+      - 7946
+      - 9095
+    volumes:
+      - ./config/loki-config.yaml:/etc/loki/config.yaml
+    depends_on:
+      - gateway
+      - minio
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  mimir-read:
+    image: grafana/mimir:latest
+    command: ["-config.file=/etc/mimir/config.yaml", "-target=read,alertmanager,overrides-exporter"]
+    deploy:
+      replicas: 3
+    ports:
+      - 3100
+      - 7946
+      - 9095
+    volumes:
+      - ./config/mimir-config.yaml:/etc/mimir/config.yaml
+      - ./config/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
+    depends_on:
+      - minio
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  mimir-write:
+    image: grafana/mimir:latest
+    command: ["-config.file=/etc/mimir/config.yaml", "-target=write,alertmanager,overrides-exporter"]
+    deploy:
+      replicas: 3
+    ports:
+      - 3100
+      - 7946
+      - 9095
+    volumes:
+      - ./config/mimir-config.yaml:/etc/mimir/config.yaml
+      - ./config/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
+    depends_on:
+      - minio
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  mimir-backend:
+    image: grafana/mimir:latest
+    command: ["-config.file=/etc/mimir/config.yaml", "-target=backend,alertmanager,overrides-exporter"]
+    ports:
+      - 3100
+      - 7946
+      - 9095
+    volumes:
+      - ./config/mimir-config.yaml:/etc/mimir/config.yaml
+      - ./config/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
+    depends_on:
+      - gateway
+      - minio
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  minio:
+    image: minio/minio:latest
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        mkdir -p /data/loki-data && \
+        mkdir -p /data/loki-ruler && \
+        mkdir -p /data/mimir-data && \
+        minio server /data
+    environment:
+      - MINIO_ROOT_USER=lgtm
+      - MINIO_ROOT_PASSWORD=supersecret
+      - MINIO_PROMETHEUS_AUTH_TYPE=public
+      - MINIO_UPDATE=off
+    ports:
+      - 9000
+    volumes:
+      - ./.data/minio:/data
+    healthcheck:
+      test: ["CMD", "curl -f http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 20s
+      retries: 5
+    networks:
+      - grafana-net
+
+  gateway:
+    image: nginx:latest
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        cat <<EOF > /etc/nginx/nginx.conf
+        user  nginx;
+        worker_processes  5;  # default: 1
+
+        events {
+          worker_connections   1000;
+        }
+
+        http {
+          resolver 127.0.0.11;
+
+          server {
+            listen             3100;
+
+            location = / {
+              return 200 'OK';
+              auth_basic off;
+            }
+
+            location = /api/prom/push {
+              proxy_pass       http://loki-write:3100\$$request_uri;
+            }
+
+            location = /api/prom/tail {
+              proxy_pass       http://loki-read:3100\$$request_uri;
+              proxy_set_header Upgrade \$$http_upgrade;
+              proxy_set_header Connection "upgrade";
+            }
+
+            location ~ /api/prom/.* {
+              proxy_pass       http://loki-read:3100\$$request_uri;
+            }
+
+            location = /loki/api/v1/push {
+              proxy_pass       http://loki-write:3100\$$request_uri;
+            }
+
+            location = /loki/api/v1/tail {
+              proxy_pass       http://loki-read:3100\$$request_uri;
+              proxy_set_header Upgrade \$$http_upgrade;
+              proxy_set_header Connection "upgrade";
+            }
+
+            location ~ /loki/api/.* {
+              proxy_pass       http://loki-read:3100\$$request_uri;
+            }
+
+            location = /prometheus/api/v1 {
+              proxy_pass       http://mimir-read:3100\$$request_uri;
+            }
+
+            location = /api/v1/push {
+              proxy_pass       http://mimir-write:3100\$$request_uri;
+            }
+
+            location ~ /api/.* {
+              proxy_pass       http://mimir-read:3100\$$request_uri;
+            }
+          }
+        }
+        EOF
+        /docker-entrypoint.sh nginx -g "daemon off;"
+    ports:
+      - 3100
+    depends_on:
+      - loki-read
+      - loki-write
+      - mimir-read
+      - mimir-write
+    healthcheck:
+      test: ["CMD", "service nginx status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  grafana:
+    image: grafana/grafana:latest
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        mkdir -p /etc/grafana/provisioning/datasources
+        /run.sh
+    environment:
+      - GF_PATH_PROVISIONING=/etc/grafana/provisioning
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    ports:
+      - 3000:3000
+    volumes:
+      - ./config/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      - gateway
+    networks:
+      - grafana-net
