@@ -84,8 +84,6 @@ services:
   mimir-read:
     image: grafana/mimir:latest
     command: ["-config.file=/etc/mimir/config.yaml", "-target=read,alertmanager,overrides-exporter"]
-    deploy:
-      replicas: 3
     ports:
       - 3100
       - 7946
@@ -106,8 +104,6 @@ services:
   mimir-write:
     image: grafana/mimir:latest
     command: ["-config.file=/etc/mimir/config.yaml", "-target=write,alertmanager,overrides-exporter"]
-    deploy:
-      replicas: 3
     ports:
       - 3100
       - 7946
