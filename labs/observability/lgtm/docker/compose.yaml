@@ -104,6 +104,8 @@ services:
   mimir-write:
     image: grafana/mimir:latest
     command: ["-config.file=/etc/mimir/config.yaml", "-target=write,alertmanager,overrides-exporter"]
+    deploy:
+      replicas: 2
     ports:
       - 3100
       - 7946
