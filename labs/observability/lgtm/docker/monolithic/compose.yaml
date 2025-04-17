@@ -1,0 +1,169 @@
+---
+networks:
+  grafana-net:
+    driver: bridge
+
+services:
+  flog:
+    image: mingrammer/flog
+    command: -f json -d 200ms -l
+    networks:
+      - grafana-net
+
+  alloy:
+    image: grafana/alloy:latest
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    ports:
+      - 12345
+    volumes:
+      - ../config/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - gateway
+    networks:
+      - grafana-net
+
+  loki:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki/local-config.yaml", "-target=all"]
+    ports:
+      - 3100
+      - 7946
+      - 9095
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  mimir-a:
+    image: grafana/mimir:latest
+    command: ["-config.file=/etc/mimir/config.yaml", "-target=all"]
+    configs:
+      - source: mimir-config
+        target: /etc/mimir/config.yaml
+    ports:
+      - 3001:3100
+      - 7946
+      - 9095
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  mimir-b:
+    image: grafana/mimir:latest
+    command: ["-config.file=/etc/mimir/config.yaml", "-target=all"]
+    configs:
+      - source: mimir-config
+        target: /etc/mimir/config.yaml
+    ports:
+      - 3100
+      - 7946
+      - 9095
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  gateway:
+    image: nginx:latest
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        cat <<EOF > /etc/nginx/nginx.conf
+        user  nginx;
+        worker_processes 5;  # default: 1
+ 
+        events {
+          worker_connections 1000;
+        }
+
+        http {
+          resolver 127.0.0.11;
+          server {
+            listen 3100;
+            location = / {
+              return 200 'OK';
+              auth_basic off;
+            }
+            location = /api/prom/push {
+              proxy_pass       http://loki:3100\$$request_uri;
+            }
+            location ~ /api/prom/.* {
+              proxy_pass       http://loki:3100\$$request_uri;
+            }
+            location = /loki/api/v1/push {
+              proxy_pass       http://loki:3100\$$request_uri;
+            }
+            location ~ /loki/api/.* {
+              proxy_pass       http://loki:3100\$$request_uri;
+            }
+            location = /prometheus/api/v1 {
+              proxy_pass       http://mimir-a:3100\$$request_uri;
+            }
+            location = /api/v1/push {
+              proxy_pass       http://mimir-a:3100\$$request_uri;
+            }
+            location ~ /api/.* {
+              proxy_pass       http://mimir-a:3100\$$request_uri;
+            }
+          }
+        }
+        EOF
+        /docker-entrypoint.sh nginx -g "daemon off;"
+    ports:
+      - 3100
+    depends_on:
+      - loki
+      - mimir-a
+    healthcheck:
+      test: ["CMD", "service nginx status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grafana-net
+
+  grafana:
+    image: grafana/grafana:latest
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        mkdir -p /etc/grafana/provisioning/datasources
+        /run.sh
+    environment:
+      - GF_PATH_PROVISIONING=/etc/grafana/provisioning
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    ports:
+      - 3000:3000
+    volumes:
+      - ../config/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      - gateway
+    networks:
+      - grafana-net
+
+configs:
+  mimir-config:
+    content: |
+      server:
+        http_listen_port: 3100
+      memberlist:
+        join_members: ["mimir-a", "mimir-b"]
