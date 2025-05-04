@@ -1,0 +1,45 @@
+---
+server:
+  http_listen_address: 0.0.0.0
+  http_listen_port: 3100
+
+# use memberlist, a gossip-based protocol, to enable the 3 replicas to communicate
+memberlist:
+  join_members: ["mimir-read", "mimir-write", "mimir-backend"]
+  dead_node_reclaim_time: 30s
+  gossip_to_dead_nodes_time: 15s
+  left_ingesters_timeout: 30s
+  bind_addr: ['0.0.0.0']
+  bind_port: 7946
+  gossip_interval: 2s
+
+# block storage requires a prefix when using a common object storage bucket
+blocks_storage:
+  storage_prefix: blocks
+  tsdb:
+    dir: /data/ingester
+
+# configure to use minio as object storage backend
+common:
+  storage:
+    backend: s3
+    s3:
+      endpoint: minio:9000
+      insecure: true
+      bucket_name: mimir-data
+      access_key_id: lgtm
+      secret_access_key: supersecret
+
+ruler:
+  rule_path: /data/ruler
+  alertmanager_url: http://127.0.0.1:3100/alertmanager
+  ring:
+    kvstore:
+      store: memberlist
+    heartbeat_period: 2s
+    heartbeat_timeout: 10s
+
+alertmanager:
+  data_dir: /data/alertmanager
+  fallback_config_file: /etc/alertmanager-fallback-config.yaml
+  external_url: http://localhost:3100/alertmanager
