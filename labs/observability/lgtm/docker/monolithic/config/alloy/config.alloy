@@ -44,3 +44,21 @@ loki.write "default" {
 	}
 	external_labels = {}
 }
+
+// enable to trace
+tracing {
+	// Write all spans. Don't do this in production.
+	sampling_fraction = 1.0
+
+	// Forward internal spans to the local tempo instance.
+	write_to = [otelcol.exporter.otlp.tempo.input]
+}
+
+otelcol.exporter.otlp "tempo" {
+	client {
+        endpoint = coalesce(sys.env("TEMPO_HOST"), "localhost:4317")
+		tls {
+			insecure = true
+		}
+	}
+}
