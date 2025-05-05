@@ -83,10 +83,6 @@ services:
     restart: on-failure
     command:
       - "-target=all"
-      - "-server.http-listen-port=3200"
-      - "-storage.trace.backend=local"                  # tell tempo where to permanently put traces
-      - "-storage.trace.wal.path=/tmp/tempo/wal"        # tell tempo where to store the wal
-      - "-storage.trace.local.path=/tmp/tempo/traces"
       - "-config.file=/etc/tempo/config.yaml"
     configs:
       - source: tempo-config
