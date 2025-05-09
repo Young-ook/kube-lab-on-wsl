@@ -28,8 +28,7 @@ services:
     environment:
       TEMPO_HOST: "tempo:4317"
     depends_on:
-      - loki
-      - mimir
+      - grafana
     networks:
       - grafana-net
 
@@ -116,9 +115,9 @@ services:
       timeout: 5s
       retries: 5
     depends_on:
-      - alloy
       - loki
       - mimir
+      - tempo
     networks:
       - grafana-net
 
@@ -131,7 +130,7 @@ configs:
         type: loki
         uid: loki
         access: proxy
-        url: http://loki:3100
+        url: "http://loki:3100"
         version: 1
         editable: true
         isDefault: false
@@ -145,7 +144,7 @@ configs:
         uid: mimir
         access: proxy
         orgId: 1
-        url: http://mimir:3100/prometheus
+        url: "http://mimir:3100/prometheus"
         version: 1
         editable: true
         isDefault: true
@@ -160,7 +159,7 @@ configs:
         uid: tempo
         access: proxy
         orgId: 1
-        url: http://tempo:3200
+        url: "http://tempo:3200"
         version: 1
         editable: true
         isDefault: false
