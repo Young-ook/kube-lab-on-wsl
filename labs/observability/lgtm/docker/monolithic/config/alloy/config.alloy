@@ -47,9 +47,9 @@ loki.write "default" {
 
 // enable tracing pipeline
 tracing {
-	// Write all spans (sampling rate == 1, it is all).
+    // Write all spans (this setting sets the sampling rate to 1, which means all data).
     // Don't use this value in production.
-	sampling_fraction = 1.0
+    sampling_fraction = 1.0
     write_to          = [otelcol.exporter.otlp.alloy.input]
 }
 
