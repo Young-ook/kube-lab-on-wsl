@@ -19,7 +19,11 @@ services:
   alloy:
     image: grafana/alloy:latest
     restart: on-failure
-    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    command:
+      - "run"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "--storage.path=/var/lib/alloy/data"
+      - "/etc/alloy/config.alloy"
     ports:
       - 12345
     volumes:
