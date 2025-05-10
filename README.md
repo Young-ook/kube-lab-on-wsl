@@ -98,5 +98,8 @@ asdf list                 # or helm version
 
 # Clean up
 
+# Troubleshooting
+- [Describe listening ports](https://phoenixnap.com/kb/linux-check-open-ports)
+
 # Additional Resources
 - [asdf - The multiple runtime version manager](https://asdf-vm.com/)

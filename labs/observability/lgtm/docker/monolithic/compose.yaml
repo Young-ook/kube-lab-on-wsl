@@ -19,22 +19,31 @@ services:
   alloy:
     image: grafana/alloy:latest
     restart: on-failure
-    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    command:
+      - "run"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "--storage.path=/var/lib/alloy/data"
+      - "/etc/alloy/config.alloy"
     ports:
       - 12345
+      - 4320
     volumes:
       - ./config/alloy:/etc/alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      ALLOY_HOST: "alloy:4320"
+      TEMPO_HOST: "tempo:4317"
     depends_on:
-      - loki
-      - mimir
+      - grafana
     networks:
       - grafana-net
 
   loki:
     image: grafana/loki:latest
     restart: on-failure
-    command: ["-config.file=/etc/loki/local-config.yaml", "-target=all"]
+    command:
+      - "-target=all"
+      - "-config.file=/etc/loki/local-config.yaml"
     ports:
       - 3100
       - 7946
@@ -51,14 +60,14 @@ services:
     image: grafana/mimir:latest
     restart: on-failure
     command:
+      - "-target=all"
       - "-server.http-listen-port=3100"
 # This is configuration to turn off "send data to ingesters: at least 2 live replicas required, could only find 1" warning.
 # Do not apply in production.
       - "-ingester.ring.store=inmemory"
       - "-ingester.ring.replication-factor=1"
-      - "-target=all"
     ports:
-      - 3001:3100
+      - 3100
       - 7946
       - 9095
     healthcheck:
@@ -66,6 +75,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - grafana-net
+
+  tempo:
+    image: grafana/tempo
+    restart: on-failure
+    command:
+      - "-target=all"
+      - "-server.http-listen-port=3200"
+      - "-storage.trace.backend=local"                  # tell tempo where to permanently put traces
+      - "-storage.trace.wal.path=/tmp/tempo/wal"        # tell tempo where to store the wal
+      - "-storage.trace.local.path=/tmp/tempo/traces"
+      - "-config.file=/etc/tempo/config.yaml"
+    configs:
+      - source: tempo-config
+        target: /etc/tempo/config.yaml
+    ports:
+      - 3200
+      - 4317
     networks:
       - grafana-net
 
@@ -82,20 +110,20 @@ services:
       - GF_PATH_PROVISIONING=/etc/grafana/provisioning
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-    ports:
-      - 3000:3000
     configs:
       - source: datasource-config
         target: /etc/grafana/provisioning/datasources/datasources.yaml
+    ports:
+      - 3000:3000
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
     depends_on:
-      - alloy
       - loki
       - mimir
+      - tempo
     networks:
       - grafana-net
 
@@ -106,22 +134,52 @@ configs:
       datasources:
       - name: Loki
         type: loki
+        uid: loki
         access: proxy
-        url: http://loki:3100
+        url: "http://loki:3100"
+        version: 1
+        editable: true
+        isDefault: false
+        basicAuth: false
         jsonData:
           httpHeaderName1: "X-Scope-OrgID"
         secureJsonData:
           httpHeaderValue1: "tenant1"
       - name: Mimir
         type: prometheus
+        uid: mimir
         access: proxy
         orgId: 1
-        url: http://mimir:3100/prometheus
+        url: "http://mimir:3100/prometheus"
         version: 1
         editable: true
         isDefault: true
+        basicAuth: false
         jsonData:
           httpHeaderName1: "X-Scope-OrgID"
           alertmanagerUid: "alertmanager"
         secureJsonData:
           httpHeaderValue1: "tenant1"
+      - name: Tempo
+        type: tempo
+        uid: tempo
+        access: proxy
+        orgId: 1
+        url: "http://tempo:3200"
+        version: 1
+        editable: true
+        isDefault: false
+        basicAuth: false
+        apiVersion: 1
+        jsonData:
+          serviceMap:
+            datasourceUid: mimir
+
+  tempo-config:
+    content: |
+      distributor:
+        receivers:
+          otlp:
+            protocols:
+              grpc:
+                endpoint: "tempo:4317"
