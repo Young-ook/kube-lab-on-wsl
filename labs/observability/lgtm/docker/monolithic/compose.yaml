@@ -26,10 +26,12 @@ services:
       - "/etc/alloy/config.alloy"
     ports:
       - 12345
+      - 4320
     volumes:
       - ./config/alloy:/etc/alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
+      ALLOY_HOST: "alloy:4320"
       TEMPO_HOST: "tempo:4317"
     depends_on:
       - grafana

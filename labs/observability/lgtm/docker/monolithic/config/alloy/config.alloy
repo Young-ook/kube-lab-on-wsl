@@ -45,20 +45,51 @@ loki.write "default" {
 	external_labels = {}
 }
 
-// enable to trace
+// enable tracing pipeline
 tracing {
-	// Write all spans. Don't do this in production.
+	// Write all spans (sampling rate == 1, it is all).
+    // Don't use this value in production.
 	sampling_fraction = 1.0
+    write_to          = [otelcol.exporter.otlp.alloy.input]
+}
 
-	// Forward internal spans to the local tempo instance.
-	write_to = [otelcol.exporter.otlp.tempo.input]
+otelcol.exporter.otlp "alloy" {
+    client {
+        endpoint = coalesce(sys.env("ALLOY_HOST"), "localhost:4320")
+        tls {
+            insecure                = true
+            insecure_skip_verify    = true
+        }
+    }
+}
+
+otelcol.receiver.otlp "default" {
+    grpc {
+        endpoint = "0.0.0.0:4320"
+    }
+
+    output {
+        traces = [otelcol.connector.servicegraph.default.input,otelcol.exporter.otlp.tempo.input]
+    }
+}
+
+otelcol.connector.servicegraph "default" {
+    dimensions = ["http.method", "http.target"]
+    output {
+        metrics = [otelcol.exporter.prometheus.default.input]
+    }
+}
+
+otelcol.exporter.prometheus "default" {
+    forward_to = [prometheus.remote_write.default.receiver]
 }
 
 otelcol.exporter.otlp "tempo" {
-	client {
+    client {
         endpoint = coalesce(sys.env("TEMPO_HOST"), "localhost:4317")
-		tls {
-			insecure = true
-		}
-	}
+        tls {
+            insecure                = true
+            insecure_skip_verify    = true
+        }
+    }
 }
