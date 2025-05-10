@@ -42,8 +42,8 @@ services:
     image: grafana/loki:latest
     restart: on-failure
     command:
-      - "-config.file=/etc/loki/local-config.yaml"
       - "-target=all"
+      - "-config.file=/etc/loki/local-config.yaml"
     ports:
       - 3100
       - 7946
