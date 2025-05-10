@@ -82,15 +82,15 @@ services:
     image: grafana/tempo
     restart: on-failure
     command:
-      - "-config.file=/etc/tempo/tempo-config.yaml"
       - "-target=all"
       - "-server.http-listen-port=3200"
       - "-storage.trace.backend=local"                  # tell tempo where to permanently put traces
       - "-storage.trace.wal.path=/tmp/tempo/wal"        # tell tempo where to store the wal
       - "-storage.trace.local.path=/tmp/tempo/traces"
+      - "-config.file=/etc/tempo/config.yaml"
     configs:
-      - source: otlp-config
-        target: /etc/tempo/tempo-config.yaml
+      - source: tempo-config
+        target: /etc/tempo/config.yaml
     ports:
       - 3200
       - 4317
@@ -175,7 +175,7 @@ configs:
           serviceMap:
             datasourceUid: mimir
 
-  otlp-config:
+  tempo-config:
     content: |
       distributor:
         receivers:
